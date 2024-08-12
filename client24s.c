@@ -12,7 +12,7 @@
 #define PATH_MAX 4096
 #endif
 
-#define PORT 8090
+#define PORT 8091
 #define BUFFER_SIZE 1024
 
 void send_command(int client_sock, const char *command, const char *arg1, const char *arg2)
@@ -206,6 +206,8 @@ void handle_command(int client_sock, const char *command, const char *arg1, cons
 
 int main()
 {
+    const char *home = getenv("HOME");
+    printf("HOME: %s\n", home);
     int client_sock;
     struct sockaddr_in server_addr;
     char command[BUFFER_SIZE], arg1[BUFFER_SIZE], arg2[BUFFER_SIZE];
