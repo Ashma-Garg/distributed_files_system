@@ -35,7 +35,6 @@ void send_file(int client_sock, const char *filename)
         perror("open file");
         return;
     }
-
     // Check the size of the file
     off_t file_size = lseek(file, 0, SEEK_END);
     lseek(file, 0, SEEK_SET); // Rewind to the start of the file
@@ -192,7 +191,10 @@ void handle_command(int client_sock, const char *command, const char *arg1, cons
         send_command(client_sock, command, arg1, arg2);
         receive_file(client_sock, arg1);
     }
-    else if (strcmp(command, "rmfile") == 0 || strcmp(command, "dtar") == 0 || strcmp(command, "display") == 0)
+    else if (strcmp(command, "rmfile") == 0) {
+        send_command(client_sock, command, arg1, arg2);
+    }
+    else if (strcmp(command, "dtar") == 0 || strcmp(command, "display") == 0)
     {
         send_command(client_sock, command, arg1, arg2);
     }
