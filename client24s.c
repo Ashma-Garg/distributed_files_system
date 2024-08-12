@@ -215,12 +215,6 @@ void handle_command(int client_sock, const char *command, const char *arg1, cons
     {
         send_command(client_sock, command, arg1, arg2);
     }
-    else if (strcmp(command, "f") == 0)
-    {
-        char base_filename[1024];
-        get_unique_filename(arg1, base_filename);
-        printf("f get_unique_filename base_filename: %s", base_filename);
-    }
     else
     {
         printf("Unknown command: %s\n", command);
