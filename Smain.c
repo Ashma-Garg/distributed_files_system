@@ -407,28 +407,35 @@ void handle_rmfile(int client_sock, char *filename, char *buffer)
 
 void handle_dtar(int client_sock, char *filetype)
 {
-    char tar_command[BUFFER_SIZE];
     char buffer[BUFFER_SIZE];
     FILE *tar_file;
     size_t file_size;
 
     if (strcmp(filetype, ".c") == 0)
     {
-        snprintf(tar_command, sizeof(tar_command), "tar -cvf cfiles.tar ~/smain/*.c");
-        system(tar_command);
+        // Handle .c files locally on Smain server
+        system("find ~/smain -name '*.c' | tar -cvf cfiles.tar -T -");
         tar_file = fopen("cfiles.tar", "rb");
     }
     else if (strcmp(filetype, ".pdf") == 0)
     {
-        snprintf(tar_command, sizeof(tar_command), "tar -cvf pdfs.tar ~/spdf/*.pdf");
-        system(tar_command);
-        tar_file = fopen("pdfs.tar", "rb");
+        // Handle .pdf files on Spdf server
+        int spdf_sock;
+        connect_to_server(PDF_ADDRESS, SPDF_PORT, &spdf_sock);
+        // Send command to Spdf server to create the tar file
+        send(spdf_sock, "dtar .pdf", strlen("dtar .pdf"), 0);
+
+        close(spdf_sock);
     }
     else if (strcmp(filetype, ".txt") == 0)
     {
-        snprintf(tar_command, sizeof(tar_command), "tar -cvf txts.tar ~/stext/*.txt");
-        system(tar_command);
-        tar_file = fopen("txts.tar", "rb");
+        // Handle .txt files on Stext server
+        int stext_sock;
+        connect_to_server(TEXT_ADDRESS, STEXT_PORT, &stext_sock);
+        // Send command to Stext server to create the tar file
+        send(stext_sock, "dtar .txt", strlen("dtar .txt"), 0);
+
+        close(stext_sock);
     }
     else
     {
@@ -437,18 +444,9 @@ void handle_dtar(int client_sock, char *filetype)
         return;
     }
 
-    if (!tar_file)
-    {
-        perror("Failed to open tar file");
-        return;
-    }
-
-    while ((file_size = fread(buffer, 1, BUFFER_SIZE, tar_file)) > 0)
-    {
-        send(client_sock, buffer, file_size, 0);
-    }
-
-    fclose(tar_file);
+    char response[BUFFER_SIZE];
+    snprintf(response, sizeof(response), "File uploaded successfully\n");
+    send(client_sock, response, strlen(response), 0);
 }
 
 void handle_display(int client_sock, char *pathname)
@@ -500,6 +498,7 @@ void connect_to_server(const char *ip, int port, int *sock)
     }
 }
 
-const char *return_home_value() {
+const char *return_home_value()
+{
     return getenv("HOME");
 }

@@ -275,9 +275,9 @@ void handle_dtar(int main_sock, char *filetype)
 
     if (strcmp(filetype, ".txt") == 0)
     {
-        snprintf(tar_command, sizeof(tar_command), "tar -cvf txt.tar ~/stext/*.txt");
+        snprintf(tar_command, sizeof(tar_command), "find ~/stext -name '*.txt' | tar -cvf textfiles.tar -T -");
         system(tar_command);
-        tar_file = fopen("txt.tar", "rb");
+        tar_file = fopen("textfiles.tar", "rb");
     }
     else
     {
@@ -291,12 +291,6 @@ void handle_dtar(int main_sock, char *filetype)
         perror("Failed to open tar file");
         return;
     }
-
-    while ((file_size = fread(buffer, 1, BUFFER_SIZE, tar_file)) > 0)
-    {
-        send(main_sock, buffer, file_size, 0);
-    }
-
     fclose(tar_file);
 }
 
