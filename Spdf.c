@@ -272,9 +272,9 @@ void handle_dtar(int client_sock, char *filetype)
 
     if (strcmp(filetype, ".pdf") == 0)
     {
-        snprintf(tar_command, sizeof(tar_command), "tar -cvf pdfs.tar ~/spdf/*.pdf");
+        snprintf(tar_command, sizeof(tar_command), "find ~/spdf -name '*.pdf' | tar -cvf pdffiles.tar -T -");
         system(tar_command);
-        tar_file = fopen("pdfs.tar", "rb");
+        tar_file = fopen("pdffiles.tar", "rb");
     }
     else
     {
@@ -287,11 +287,6 @@ void handle_dtar(int client_sock, char *filetype)
     {
         perror("Failed to open tar file");
         return;
-    }
-
-    while ((file_size = fread(buffer, 1, BUFFER_SIZE, tar_file)) > 0)
-    {
-        send(client_sock, buffer, file_size, 0);
     }
 
     fclose(tar_file);
