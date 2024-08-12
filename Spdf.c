@@ -254,9 +254,12 @@ void handle_dfile(int client_sock, char *filename)
 void handle_rmfile(int client_sock, char *filename)
 {
     char file_path[BUFFER_SIZE];
+    char response[BUFFER_SIZE];
 
-    snprintf(file_path, sizeof(file_path), "~/spdf/%s", filename);
+    snprintf(file_path, sizeof(file_path), "/home/garg83/spdf/%s", filename);
     remove(file_path);
+    snprintf(response, sizeof(response), "File %s deleted successfully.\n", filename);
+    send(client_sock, response, strlen(response), 0);
 }
 
 void handle_dtar(int client_sock, char *filetype)

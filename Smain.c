@@ -20,7 +20,7 @@
 void handle_client(int client_sock);
 void handle_ufile(int client_sock, char *filename, char *dest_path, char *buffer);
 void handle_dfile(int client_sock, char *filename, char *buffer);
-void handle_rmfile(int client_sock, char *filename);
+void handle_rmfile(int client_sock, char *filename, char *buffer);
 void handle_dtar(int client_sock, char *filetype);
 void handle_display(int client_sock, char *pathname);
 void connect_to_server(const char *ip, int port, int *sock);
@@ -38,7 +38,7 @@ int main()
     }
 
     server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = INADDR_ANY;
+    server_addr.sin_addr.s_addr = INADDR_ANY; // 127.0.0.1
     server_addr.sin_port = htons(PORT);
 
     if (bind(server_sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
@@ -71,7 +71,6 @@ int main()
         else
         {
             close(client_sock);
-            wait(NULL);
         }
     }
 
@@ -135,7 +134,7 @@ void handle_client(int client_sock)
         }
         else if (strcmp(command, "rmfile") == 0)
         {
-            handle_rmfile(client_sock, arg1);
+            handle_rmfile(client_sock, arg1, buffer);
         }
         else if (strcmp(command, "dtar") == 0)
         {
@@ -361,7 +360,7 @@ void handle_dfile(int client_sock, char *filename, char *initial_command)
                 break; // End of file
             }
         }
-        
+
         int len = recv(spdf_sock, response, sizeof(response), 0);
         send(client_sock, response, sizeof(response), 0);
         close(spdf_sock);
@@ -373,26 +372,35 @@ void handle_dfile(int client_sock, char *filename, char *initial_command)
     }
 }
 
-void handle_rmfile(int client_sock, char *filename)
+void handle_rmfile(int client_sock, char *filename, char *buffer)
 {
-    char file_path[BUFFER_SIZE];
+    char response[BUFFER_SIZE];
+    if (strstr(filename, ".c") != NULL)
+    {
+        char file_path[BUFFER_SIZE];
 
-    snprintf(file_path, sizeof(file_path), "~/smain/%s", filename);
-    remove(file_path);
-
+        snprintf(file_path, sizeof(file_path), "/home/garg83/smain/%s", filename);
+        remove(file_path);
+        snprintf(response, sizeof(response), "File %s deleted successfully.\n", filename);
+        send(client_sock, response, strlen(response), 0);
+    }
     // Request removal from Spdf or Stext if the file is .pdf or .txt
     if (strstr(filename, ".txt") != NULL)
     {
         int stext_sock;
-        connect_to_server("127.0.0.1", STEXT_PORT, &stext_sock);
-        send(stext_sock, filename, strlen(filename), 0);
+        connect_to_server(TEXT_ADDRESS, STEXT_PORT, &stext_sock);
+        send(stext_sock, buffer, strlen(buffer), 0);
+        int len = recv(stext_sock, response, BUFFER_SIZE, 0);
+        send(client_sock, response, strlen(response), 0);
         close(stext_sock);
     }
     else if (strstr(filename, ".pdf") != NULL)
     {
         int spdf_sock;
-        connect_to_server("127.0.0.1", SPDF_PORT, &spdf_sock);
-        send(spdf_sock, filename, strlen(filename), 0);
+        connect_to_server(PDF_ADDRESS, SPDF_PORT, &spdf_sock);
+        send(spdf_sock, buffer, strlen(buffer), 0);
+        int len = recv(spdf_sock, response, BUFFER_SIZE, 0);
+        send(client_sock, response, strlen(response), 0);
         close(spdf_sock);
     }
 }

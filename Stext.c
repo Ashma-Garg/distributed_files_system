@@ -14,15 +14,15 @@
 #define BUFFER_SIZE 1024
 #define ADDRESS "127.0.0.2"
 
-void handle_client(int client_sock);
-void handle_ufile(int client_sock, char *filename, char *dest_path, char *buffer);
-void handle_dfile(int client_sock, char *filename);
-void handle_rmfile(int client_sock, char *filename);
-void handle_dtar(int client_sock, char *filetype);
+void handle_client(int main_sock);
+void handle_ufile(int main_sock, char *filename, char *dest_path, char *buffer);
+void handle_dfile(int main_sock, char *filename);
+void handle_rmfile(int main_sock, char *filename);
+void handle_dtar(int main_sock, char *filetype);
 
 int main()
 {
-    int server_sock, client_sock;
+    int server_sock, main_sock;
     struct sockaddr_in server_addr, client_addr;
     socklen_t addr_len = sizeof(client_addr);
 
@@ -58,25 +58,25 @@ int main()
 
     printf("Stext server listening on port %d...\n", PORT);
 
-    while ((client_sock = accept(server_sock, (struct sockaddr *)&client_addr, &addr_len)) >= 0)
+    while ((main_sock = accept(server_sock, (struct sockaddr *)&client_addr, &addr_len)) >= 0)
     {
         printf("New client connected to Stext\n");
 
         if (fork() == 0)
         {
             close(server_sock);
-            handle_client(client_sock);
-            close(client_sock);
+            handle_client(main_sock);
+            close(main_sock);
             exit(0);
         }
         else
         {
-            close(client_sock);
+            close(main_sock);
             wait(NULL);
         }
     }
 
-    if (client_sock < 0)
+    if (main_sock < 0)
     {
         perror("Accept failed");
         close(server_sock);
@@ -87,7 +87,7 @@ int main()
     return 0;
 }
 
-void handle_client(int client_sock)
+void handle_client(int main_sock)
 {
     char buffer[BUFFER_SIZE];
     char command[BUFFER_SIZE];
@@ -101,7 +101,7 @@ void handle_client(int client_sock)
         memset(arg2, 0, BUFFER_SIZE);
 
         // Receive data from client
-        int recv_len = recv(client_sock, buffer, BUFFER_SIZE, 0);
+        int recv_len = recv(main_sock, buffer, BUFFER_SIZE, 0);
         if (recv_len <= 0)
         {
             perror("recv failed");
@@ -115,24 +115,24 @@ void handle_client(int client_sock)
 
         if (strcmp(command, "ufile") == 0)
         {
-            handle_ufile(client_sock, arg1, arg2, buffer);
+            handle_ufile(main_sock, arg1, arg2, buffer);
         }
         else if (strcmp(command, "dfile") == 0)
         {
-            handle_dfile(client_sock, arg1);
+            handle_dfile(main_sock, arg1);
         }
         else if (strcmp(command, "rmfile") == 0)
         {
-            handle_rmfile(client_sock, arg1);
+            handle_rmfile(main_sock, arg1);
         }
         else if (strcmp(command, "dtar") == 0)
         {
-            handle_dtar(client_sock, arg1);
+            handle_dtar(main_sock, arg1);
         }
         else
         {
             char *msg = "Invalid command\n";
-            send(client_sock, msg, strlen(msg), 0);
+            send(main_sock, msg, strlen(msg), 0);
         }
     }
 }
@@ -174,7 +174,7 @@ int create_directory_recursive(const char *path)
     return 0;
 }
 
-void handle_ufile(int client_sock, char *filename, char *dest_path, char *buffer)
+void handle_ufile(int main_sock, char *filename, char *dest_path, char *buffer)
 {
     char file_path[BUFFER_SIZE];
     FILE *file;
@@ -194,11 +194,11 @@ void handle_ufile(int client_sock, char *filename, char *dest_path, char *buffer
     if (file == NULL)
     {
         snprintf(response, sizeof(response), "Failed to open file %s for writing\n", file_path);
-        send(client_sock, response, strlen(response), 0);
+        send(main_sock, response, strlen(response), 0);
         return;
     }
     printf("Receiving file: %s\n", file_path);
-    while ((bytes_received = recv(client_sock, file_buffer, sizeof(file_buffer), 0)) > 0)
+    while ((bytes_received = recv(main_sock, file_buffer, sizeof(file_buffer), 0)) > 0)
     {
         printf("Received %d bytes\n", bytes_received);
         fwrite(file_buffer, 1, bytes_received, file);
@@ -210,10 +210,10 @@ void handle_ufile(int client_sock, char *filename, char *dest_path, char *buffer
     }
 
     snprintf(response, sizeof(response), "File %s uploaded successfully\n", filename);
-    send(client_sock, response, strlen(response), 0);
+    send(main_sock, response, strlen(response), 0);
 }
 
-void handle_dfile(int client_sock, char *filename)
+void handle_dfile(int main_sock, char *filename)
 {
     char buffer[BUFFER_SIZE];
     char file_path[BUFFER_SIZE];
@@ -235,11 +235,11 @@ void handle_dfile(int client_sock, char *filename)
     {
         if (file_size == 0)
         {
-            send(client_sock, buffer, 1, 0);
+            send(main_sock, buffer, 1, 0);
         }
         else
         {
-            send(client_sock, buffer, file_size, 0);
+            send(main_sock, buffer, file_size, 0);
         }
         if (file_size < sizeof(buffer))
         {
@@ -251,18 +251,21 @@ void handle_dfile(int client_sock, char *filename)
     sleep(5);
 
     snprintf(response, sizeof(response), "File %s uploaded successfully\n", filename);
-    send(client_sock, response, strlen(response), 0);
+    send(main_sock, response, strlen(response), 0);
 }
 
-void handle_rmfile(int client_sock, char *filename)
+void handle_rmfile(int main_sock, char *filename)
 {
+    char response[BUFFER_SIZE];
     char file_path[BUFFER_SIZE];
 
-    snprintf(file_path, sizeof(file_path), "~/stext/%s", filename);
+    snprintf(file_path, sizeof(file_path), "/home/garg83/stext/%s", filename);
     remove(file_path);
+    snprintf(response, sizeof(response), "File %s deleted successfully.\n", filename);
+    send(main_sock, response, strlen(response), 0);
 }
 
-void handle_dtar(int client_sock, char *filetype)
+void handle_dtar(int main_sock, char *filetype)
 {
     char tar_command[BUFFER_SIZE];
     char buffer[BUFFER_SIZE];
@@ -278,7 +281,7 @@ void handle_dtar(int client_sock, char *filetype)
     else
     {
         char *msg = "Unsupported file type\n";
-        send(client_sock, msg, strlen(msg), 0);
+        send(main_sock, msg, strlen(msg), 0);
         return;
     }
 
@@ -290,7 +293,7 @@ void handle_dtar(int client_sock, char *filetype)
 
     while ((file_size = fread(buffer, 1, BUFFER_SIZE, tar_file)) > 0)
     {
-        send(client_sock, buffer, file_size, 0);
+        send(main_sock, buffer, file_size, 0);
     }
 
     fclose(tar_file);
