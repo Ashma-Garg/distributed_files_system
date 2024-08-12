@@ -14,6 +14,7 @@
 #define BUFFER_SIZE 1024
 #define ADDRESS "127.0.0.2"
 
+const char *return_home_value();
 void handle_client(int main_sock);
 void handle_ufile(int main_sock, char *filename, char *dest_path, char *buffer);
 void handle_dfile(int main_sock, char *filename);
@@ -183,12 +184,12 @@ void handle_ufile(int main_sock, char *filename, char *dest_path, char *buffer)
     char file_buffer[BUFFER_SIZE];
     int bytes_received;
 
-    snprintf(destination_path, sizeof(destination_path), "/home/garg83/stext/%s", dest_path);
+    snprintf(destination_path, sizeof(destination_path), "%s/stext/%s", return_home_value(), dest_path);
     if (create_directory_recursive(destination_path) != 0)
     {
         return;
     }
-    snprintf(file_path, sizeof(file_path), "/home/garg83/stext/%s/%s", dest_path, filename);
+    snprintf(file_path, sizeof(file_path), "%s/stext/%s/%s", return_home_value(), dest_path, filename);
 
     file = fopen(file_path, "wb");
     if (file == NULL)
@@ -221,7 +222,7 @@ void handle_dfile(int main_sock, char *filename)
     int file_size;
     char response[BUFFER_SIZE];
 
-    snprintf(file_path, sizeof(file_path), "/home/garg83/stext/%s", filename);
+    snprintf(file_path, sizeof(file_path), "%s/stext/%s", return_home_value(), filename);
     printf("File to be uploaded from: %s\n", file_path);
     file = open(file_path, O_RDONLY);
 
@@ -259,7 +260,7 @@ void handle_rmfile(int main_sock, char *filename)
     char response[BUFFER_SIZE];
     char file_path[BUFFER_SIZE];
 
-    snprintf(file_path, sizeof(file_path), "/home/garg83/stext/%s", filename);
+    snprintf(file_path, sizeof(file_path), "%s/stext/%s", return_home_value(), filename);
     remove(file_path);
     snprintf(response, sizeof(response), "File %s deleted successfully.\n", filename);
     send(main_sock, response, strlen(response), 0);
@@ -297,4 +298,9 @@ void handle_dtar(int main_sock, char *filetype)
     }
 
     fclose(tar_file);
+}
+
+const char *return_home_value()
+{
+    return getenv("HOME");
 }

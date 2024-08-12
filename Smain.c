@@ -10,13 +10,14 @@
 #include <fcntl.h>
 #include <errno.h>
 
-#define PORT 8090
+#define PORT 8091
 #define BUFFER_SIZE 1024
 #define SPDF_PORT 8088
 #define STEXT_PORT 8089
 #define TEXT_ADDRESS "127.0.0.2"
 #define PDF_ADDRESS "127.0.0.3"
 
+const char *return_home_value();
 void handle_client(int client_sock);
 void handle_ufile(int client_sock, char *filename, char *dest_path, char *buffer);
 void handle_dfile(int client_sock, char *filename, char *buffer);
@@ -36,7 +37,6 @@ int main()
         perror("Socket failed");
         exit(EXIT_FAILURE);
     }
-
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = INADDR_ANY; // 127.0.0.1
     server_addr.sin_port = htons(PORT);
@@ -201,14 +201,14 @@ void handle_ufile(int client_sock, char *filename, char *dest_path, char *buffer
     if (strstr(filename, ".c") != NULL)
     {
         // Construct the file path on the server
-        snprintf(destination_path, sizeof(destination_path), "/home/garg83/smain/%s", dest_path);
+        snprintf(destination_path, sizeof(destination_path), "%s/smain/%s", return_home_value(), dest_path);
         // Create the destination directory if it doesn't exist
         if (create_directory_recursive(destination_path) != 0)
         {
             return;
         }
 
-        snprintf(file_path, sizeof(file_path), "/home/garg83/smain/%s/%s", dest_path, filename);
+        snprintf(file_path, sizeof(file_path), "%s/smain/%s/%s", return_home_value(), dest_path, filename);
         // Open the file for writing
         file = fopen(file_path, "wb");
         if (file == NULL)
@@ -297,7 +297,7 @@ void handle_dfile(int client_sock, char *filename, char *initial_command)
 
     if (strstr(filename, ".c") != NULL)
     {
-        snprintf(file_path, sizeof(file_path), "/home/garg83/smain/%s", filename);
+        snprintf(file_path, sizeof(file_path), "%s/smain/%s", return_home_value(), filename);
         printf("File: %s\n", file_path);
 
         file = open(file_path, O_RDONLY);
@@ -379,7 +379,7 @@ void handle_rmfile(int client_sock, char *filename, char *buffer)
     {
         char file_path[BUFFER_SIZE];
 
-        snprintf(file_path, sizeof(file_path), "/home/garg83/smain/%s", filename);
+        snprintf(file_path, sizeof(file_path), "%s/smain/%s", return_home_value(), filename);
         remove(file_path);
         snprintf(response, sizeof(response), "File %s deleted successfully.\n", filename);
         send(client_sock, response, strlen(response), 0);
@@ -498,4 +498,8 @@ void connect_to_server(const char *ip, int port, int *sock)
         perror("Connection failed");
         exit(EXIT_FAILURE);
     }
+}
+
+const char *return_home_value() {
+    return getenv("HOME");
 }
