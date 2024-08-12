@@ -206,8 +206,6 @@ void handle_command(int client_sock, const char *command, const char *arg1, cons
 
 int main()
 {
-    const char *home = getenv("HOME");
-    printf("HOME: %s\n", home);
     int client_sock;
     struct sockaddr_in server_addr;
     char command[BUFFER_SIZE], arg1[BUFFER_SIZE], arg2[BUFFER_SIZE];
