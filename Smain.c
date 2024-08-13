@@ -590,7 +590,6 @@ void handle_display(int client_sock, char *pathname) {
         printf("handle_display: No .pdf files received from Spdf for %s\n", pathname);
     }
 
-    printf("hello boo\n");
 
     // Step 3: Communicate with Stext server to get the list of .txt files
     connect_to_server(TEXT_ADDRESS, STEXT_PORT, &stext_sock);
