@@ -9,8 +9,9 @@
 #include <fcntl.h>
 #include <sys/wait.h>
 #include <errno.h>
+#include <libgen.h>
 
-#define PORT 8089
+#define PORT 8095
 #define BUFFER_SIZE 1024
 #define ADDRESS "127.0.0.2"
 
@@ -20,6 +21,7 @@ void handle_ufile(int main_sock, char *filename, char *dest_path, char *buffer);
 void handle_dfile(int main_sock, char *filename);
 void handle_rmfile(int main_sock, char *filename);
 void handle_dtar(int main_sock, char *filetype);
+void handle_display(int client_sock, char *pathname);
 
 int main()
 {
@@ -88,14 +90,12 @@ int main()
     return 0;
 }
 
-void handle_client(int main_sock)
-{
+void handle_client(int main_sock) {
     char buffer[BUFFER_SIZE];
     char command[BUFFER_SIZE];
     char arg1[BUFFER_SIZE], arg2[BUFFER_SIZE];
 
-    while (1)
-    {
+    while (1) {
         memset(buffer, 0, BUFFER_SIZE);
         memset(command, 0, BUFFER_SIZE);
         memset(arg1, 0, BUFFER_SIZE);
@@ -103,8 +103,7 @@ void handle_client(int main_sock)
 
         // Receive data from client
         int recv_len = recv(main_sock, buffer, BUFFER_SIZE, 0);
-        if (recv_len <= 0)
-        {
+        if (recv_len <= 0) {
             perror("recv failed");
             break;
         }
@@ -114,24 +113,17 @@ void handle_client(int main_sock)
 
         sscanf(buffer, "%s %s %s", command, arg1, arg2);
 
-        if (strcmp(command, "ufile") == 0)
-        {
+        if (strcmp(command, "ufile") == 0) {
             handle_ufile(main_sock, arg1, arg2, buffer);
-        }
-        else if (strcmp(command, "dfile") == 0)
-        {
+        } else if (strcmp(command, "dfile") == 0) {
             handle_dfile(main_sock, arg1);
-        }
-        else if (strcmp(command, "rmfile") == 0)
-        {
+        } else if (strcmp(command, "rmfile") == 0) {
             handle_rmfile(main_sock, arg1);
-        }
-        else if (strcmp(command, "dtar") == 0)
-        {
+        } else if (strcmp(command, "dtar") == 0) {
             handle_dtar(main_sock, arg1);
-        }
-        else
-        {
+        } else if (strcmp(command, "display") == 0) {
+            handle_display(main_sock, arg1);
+        } else {
             char *msg = "Invalid command\n";
             send(main_sock, msg, strlen(msg), 0);
         }
@@ -293,6 +285,44 @@ void handle_dtar(int main_sock, char *filetype)
     }
     fclose(tar_file);
 }
+
+void handle_display(int main_sock, char *pathname) {
+    char buffer[BUFFER_SIZE];
+    char command[BUFFER_SIZE];
+    FILE *pipe;
+    size_t file_size;
+
+    // Construct the full path
+    snprintf(command, sizeof(command), "%s/stext/%s", return_home_value(), pathname);
+
+    // Check if the directory exists
+    struct stat st;
+    if (stat(command, &st) != 0 || !S_ISDIR(st.st_mode)) {
+        // If the directory does not exist or is not a directory, return an empty response
+        snprintf(buffer, sizeof(buffer), "DIRECTORY_NOT_FOUND\n");  // Send an empty string
+        send(main_sock, buffer, strlen(buffer), 0);
+        return;
+    }
+
+    // Construct the command to find .txt files in the specified directory
+    snprintf(command, sizeof(command), "find %s/stext/%s -type f -name '*.txt'", return_home_value(), pathname);
+    pipe = popen(command, "r");
+    if (!pipe) {
+        perror("popen failed");
+        return;
+    }
+
+    // Read the list of .txt files and send it to the client
+    while (fgets(buffer, sizeof(buffer), pipe) != NULL) {
+        buffer[strcspn(buffer, "\n")] = 0;  // Remove newline character
+        char *filename = basename(buffer);  // Extract the file name
+        snprintf(buffer, sizeof(buffer), "%s\n", filename);  // Format the output with just the filename
+        send(main_sock, buffer, strlen(buffer), 0);  // Send the filename to the client
+    }
+
+    pclose(pipe);
+}
+
 
 const char *return_home_value()
 {

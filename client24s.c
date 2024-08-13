@@ -12,7 +12,7 @@
 #define PATH_MAX 4096
 #endif
 
-#define PORT 8091
+#define PORT 8090
 #define BUFFER_SIZE 1024
 
 void send_command(int client_sock, const char *command, const char *arg1, const char *arg2)

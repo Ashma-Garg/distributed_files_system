@@ -9,11 +9,12 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <libgen.h>
 
-#define PORT 8091
+#define PORT 8090
 #define BUFFER_SIZE 1024
-#define SPDF_PORT 8088
-#define STEXT_PORT 8089
+#define SPDF_PORT 8094
+#define STEXT_PORT 8095
 #define TEXT_ADDRESS "127.0.0.2"
 #define PDF_ADDRESS "127.0.0.3"
 
@@ -449,28 +450,190 @@ void handle_dtar(int client_sock, char *filetype)
     send(client_sock, response, strlen(response), 0);
 }
 
-void handle_display(int client_sock, char *pathname)
-{
-    char command[BUFFER_SIZE];
+// void handle_display(int client_sock, char *pathname) {
+//     char buffer[BUFFER_SIZE];
+//     char file_list[BUFFER_SIZE * 10] = "";  // Large buffer to store the combined list
+//     FILE *pipe;
+//     size_t file_size;
+//     int spdf_sock, stext_sock;
+
+//     printf("handle_display: Received pathname: %s\n", pathname);
+
+//     // Step 1: Get the list of .c files locally in smain directory
+//     char command[BUFFER_SIZE];
+//     snprintf(command, sizeof(command), "find %s/smain/%s -type f -name '*.c'", return_home_value(), pathname);
+//     printf("handle_display: Executing command: %s\n", command);
+//     pipe = popen(command, "r");
+//     if (pipe) {
+//         // Read the list of .c files and append to the file_list buffer
+//         while (fgets(buffer, sizeof(buffer), pipe) != NULL) {
+//             buffer[strcspn(buffer, "\n")] = 0;  // Remove newline character
+//             char *filename = basename(buffer);  // Extract the file name
+//             printf("handle_display: Found .c file: %s\n", filename); // Debug line
+//             strncat(file_list, filename, sizeof(file_list) - strlen(file_list) - 1);
+//             strncat(file_list, "\n", sizeof(file_list) - strlen(file_list) - 1);
+//         }
+//         pclose(pipe);
+//     } else {
+//         perror("popen failed for smain");
+//     }
+
+//     // Step 2: Communicate with Spdf server to get the list of .pdf files
+//     connect_to_server(PDF_ADDRESS, SPDF_PORT, &spdf_sock);
+//     snprintf(buffer, sizeof(buffer), "display %s", pathname);
+//     send(spdf_sock, buffer, strlen(buffer), 0);
+//     printf("handle_display: Sent display command to Spdf server\n");
+
+//     while ((file_size = recv(spdf_sock, buffer, sizeof(buffer) - 1, 0)) > 0) {
+//         buffer[file_size] = '\0';
+//         printf("handle_display: Received .pdf file from Spdf: %s", buffer); // Debug line
+//         strncat(file_list, buffer, sizeof(file_list) - strlen(file_list) - 1);
+//         if (file_size < sizeof(buffer))
+//             {
+//                 printf("End of file detected\n");
+//                 break; // End of file
+//             }
+//     }
+//     close(spdf_sock);
+
+//     // Step 3: Communicate with Stext server to get the list of .txt files
+//     connect_to_server(TEXT_ADDRESS, STEXT_PORT, &stext_sock);
+//     snprintf(buffer, sizeof(buffer), "display %s", pathname);
+//     send(stext_sock, buffer, strlen(buffer), 0);
+//     printf("handle_display: Sent display command to Stext server\n");
+
+//     while ((file_size = recv(stext_sock, buffer, sizeof(buffer) - 1, 0)) > 0) {
+//         buffer[file_size] = '\0';
+//         printf("handle_display: Received .txt file from Stext: %s", buffer); // Debug line
+//         strncat(file_list, buffer, sizeof(file_list) - strlen(file_list) - 1);
+//         if (file_size < sizeof(buffer))
+//             {
+//                 printf("End of file detected\n");
+//                 break; // End of file
+//             }
+//     }
+//     close(stext_sock);
+
+//     // Step 4: Send the combined list back to the client
+//     printf("handle_display: Sending combined file list to client\n");
+//     send(client_sock, file_list, strlen(file_list), 0);
+// }
+
+void handle_display(int client_sock, char *pathname) {
     char buffer[BUFFER_SIZE];
+    char file_list[BUFFER_SIZE * 10] = "";  // Large buffer to store the combined list
     FILE *pipe;
     size_t file_size;
+    int spdf_sock, stext_sock;
 
-    snprintf(command, sizeof(command), "find ~/smain/%s -type f \( -name '*.c' -o -name '*.pdf' -o -name '*.txt' \)", pathname);
-    pipe = popen(command, "r");
-    if (!pipe)
-    {
-        perror("popen failed");
-        return;
+    printf("handle_display: Received pathname: %s\n", pathname);
+
+    // Step 1: Check if the directory exists locally for .c files
+    char local_path[BUFFER_SIZE];
+    snprintf(local_path, sizeof(local_path), "%s/smain/%s", return_home_value(), pathname);
+
+    struct stat st;
+    if (stat(local_path, &st) == 0 && S_ISDIR(st.st_mode)) {
+        // Directory exists, proceed to find .c files
+        char command[BUFFER_SIZE];
+        snprintf(command, sizeof(command), "find %s/smain/%s -type f -name '*.c'", return_home_value(), pathname);
+        printf("handle_display: Executing command: %s\n", command);
+        pipe = popen(command, "r");
+        if (pipe) {
+            while (fgets(buffer, sizeof(buffer), pipe) != NULL) {
+                buffer[strcspn(buffer, "\n")] = 0;  // Remove newline character
+                char *filename = basename(buffer);  // Extract the file name
+                printf("handle_display: Found .c file: %s\n", filename); // Debug output
+                strncat(file_list, filename, sizeof(file_list) - strlen(file_list) - 1);
+                strncat(file_list, "\n", sizeof(file_list) - strlen(file_list) - 1);
+            }
+            pclose(pipe);
+        } else {
+            perror("popen failed for smain");
+        }
+    } else {
+        printf("handle_display: Directory %s not found in smain\n", local_path);
     }
 
-    while ((file_size = fread(buffer, 1, BUFFER_SIZE, pipe)) > 0)
-    {
-        send(client_sock, buffer, file_size, 0);
+    // Step 2: Communicate with Spdf server to get the list of .pdf files
+    connect_to_server(PDF_ADDRESS, SPDF_PORT, &spdf_sock);
+    snprintf(buffer, sizeof(buffer), "display %s", pathname);
+    send(spdf_sock, buffer, strlen(buffer), 0);
+    printf("handle_display: Sent display command to Spdf server\n");
+
+    int received_anything_spdf = 0;
+    while ((file_size = recv(spdf_sock, buffer, sizeof(buffer) - 1, 0)) > 0) {
+        buffer[file_size] = '\0';
+        if (strcmp(buffer, "DIRECTORY_NOT_FOUND\n") == 0) {
+            printf("handle_display: Directory not found on Spdf for %s\n", pathname);
+            break;  // Ignore this message
+        }
+        received_anything_spdf = 1;
+        char *line = strtok(buffer, "\n");
+        while (line != NULL) {
+            char *filename = basename(line);  // Extract the file name
+            printf("handle_display: Received .pdf file from Spdf: %s\n", filename); // Debug output
+            strncat(file_list, filename, sizeof(file_list) - strlen(file_list) - 1);
+            strncat(file_list, "\n", sizeof(file_list) - strlen(file_list) - 1);
+            line = strtok(NULL, "\n");
+            if (file_size < sizeof(buffer))
+            {
+                printf("End of file detected\n");
+                break; // End of file
+            }
+        }
+        break;
+    }
+    close(spdf_sock);
+
+    if (received_anything_spdf == 0) {
+        printf("handle_display: No .pdf files received from Spdf for %s\n", pathname);
     }
 
-    pclose(pipe);
+    printf("hello boo\n");
+
+    // Step 3: Communicate with Stext server to get the list of .txt files
+    connect_to_server(TEXT_ADDRESS, STEXT_PORT, &stext_sock);
+    snprintf(buffer, sizeof(buffer), "display %s", pathname);
+    send(stext_sock, buffer, strlen(buffer), 0);
+    printf("handle_display: Sent display command to Stext server\n");
+
+    int received_anything_stext = 0;
+    while ((file_size = recv(stext_sock, buffer, sizeof(buffer) - 1, 0)) > 0) {
+        buffer[file_size] = '\0';
+        if (strcmp(buffer, "DIRECTORY_NOT_FOUND\n") == 0) {
+            printf("handle_display: Directory not found on Stext for %s\n", pathname);
+            break;  // Ignore this message
+        }
+        received_anything_stext = 1;
+        char *line = strtok(buffer, "\n");
+        while (line != NULL) {
+            char *filename = basename(line);  // Extract the file name
+            printf("handle_display: Received .txt file from Stext: %s\n", filename); // Debug output
+            strncat(file_list, filename, sizeof(file_list) - strlen(file_list) - 1);
+            strncat(file_list, "\n", sizeof(file_list) - strlen(file_list) - 1);
+            line = strtok(NULL, "\n");
+            if (file_size < sizeof(buffer))
+            {
+                printf("End of file detected\n");
+                break; // End of file
+            }
+        }
+        break;
+    }
+    close(stext_sock);
+
+    if (received_anything_stext == 0) {
+        printf("handle_display: No .txt files received from Stext for %s\n", pathname);
+    }
+
+    // Step 4: Send the combined list back to the client
+    printf("handle_display: Sending combined file list to client:\n%s", file_list);
+    send(client_sock, file_list, strlen(file_list), 0);
 }
+
+
+
 
 void connect_to_server(const char *ip, int port, int *sock)
 {
