@@ -11,7 +11,7 @@
 #include <errno.h>
 #include <libgen.h>
 
-#define PORT 8090
+#define PORT 8091
 #define BUFFER_SIZE 1024
 #define SPDF_PORT 8094
 #define STEXT_PORT 8095

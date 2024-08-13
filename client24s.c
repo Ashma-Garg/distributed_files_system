@@ -12,7 +12,7 @@
 #define PATH_MAX 4096
 #endif
 
-#define PORT 8090
+#define PORT 8091
 #define BUFFER_SIZE 1024
 
 void send_command(int client_sock, const char *command, const char *arg1, const char *arg2)
@@ -91,16 +91,32 @@ void get_unique_filename(const char *folder_path, char *unique_filename)
     char temp_filename[BUFFER_SIZE];
     char folder_name[1024];
     char base_filename[1024];
-
-    // split_path(folder_path, folder_name, base_filename);
+    char base_name[BUFFER_SIZE];
+    char extension[BUFFER_SIZE];
+    split_path(folder_path, folder_name, base_filename);
+    // Split the base_filename into base_name and extension
+    const char *dot = strrchr(base_filename, '.');
+    if (dot)
+    {
+        // Extract base name and extension
+        size_t base_name_length = dot - base_filename;
+        snprintf(base_name, base_name_length + 1, "%s", base_filename);
+        snprintf(extension, BUFFER_SIZE, "%s", dot);
+    }
+    else
+    {
+        // No extension found
+        snprintf(base_name, BUFFER_SIZE, "%s", base_filename);
+        extension[0] = '\0'; // No extension
+    }
 
     // Combine the folder path and base filename to form the initial full path
-    snprintf(unique_filename, BUFFER_SIZE, "%s", folder_path);
+    snprintf(unique_filename, BUFFER_SIZE, "%s%s", folder_name, base_filename);
 
     // Check if file exists in the specified folder and generate a unique filename if necessary
     while (access(unique_filename, F_OK) != -1)
     {
-        snprintf(temp_filename, BUFFER_SIZE, "%s%s(%d)", folder_path, base_filename, i++);
+        snprintf(temp_filename, BUFFER_SIZE, "%s%s(%d)%s", folder_name, base_name, i++, extension);
         snprintf(unique_filename, BUFFER_SIZE, "%s", temp_filename);
     }
 }
@@ -191,7 +207,8 @@ void handle_command(int client_sock, const char *command, const char *arg1, cons
         send_command(client_sock, command, arg1, arg2);
         receive_file(client_sock, arg1);
     }
-    else if (strcmp(command, "rmfile") == 0) {
+    else if (strcmp(command, "rmfile") == 0)
+    {
         send_command(client_sock, command, arg1, arg2);
     }
     else if (strcmp(command, "dtar") == 0 || strcmp(command, "display") == 0)
