@@ -1,3 +1,4 @@
+// stating all required libraries for the code here
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,48 +9,85 @@
 #include <errno.h>
 #include <limits.h>
 
+// if PATH_MAX is not found then self declare it
 #ifndef PATH_MAX
 #define PATH_MAX 4096
 #endif
-
-#define PORT 8091
+// defining all necessary self defined macros which will be used through out the code
+// this is the port where client will be running
+#define PORT 8051
+// this is the macros for buffer_size
 #define BUFFER_SIZE 1024
+#define IP_ADDRESS "127.0.0.1"
 
-void send_command(int client_sock, const char *command, const char *arg1, const char *arg2)
+// redefining already defined data types in system
+#define character char
+#define constant const
+#define number int
+#define empty_return_function void
+#define object struct
+#define channel_length socklen_t
+#define ZERO 0
+#define show_on_cmd printf
+
+// common varibales will be used through out the code
+const char *UPLOAD_FILE = "ufile";
+const char *DOWNLOAD_FILE = "dfile";
+const char *REMOVE_FILE = "rmfile";
+const char *GENERATE_TAR = "dtar";
+const char *DISPLAY_LIST = "display";
+
+// function deliver_command_to_server to send command to smain
+empty_return_function deliver_command_to_server(number channel_for_client, constant character *instruction_from_user, constant character *parameter_1, constant character *parameter_2)
 {
-    char buffer[BUFFER_SIZE];
-    snprintf(buffer, sizeof(buffer), "%s %s %s", command, arg1, arg2);
+    // a buffer string for storing the values
+    character string_storage[BUFFER_SIZE];
+    // build string_storage string by concatinating instruction_from_user i.e. command, parameter_1 i.e arguemnt 1, parameter_2 i.e argueemnt 2
+    snprintf(string_storage, sizeof(string_storage), "%s %s %s", instruction_from_user, parameter_1, parameter_2);
 
-    if (send(client_sock, buffer, strlen(buffer), 0) == -1)
+    // send this to server and if there is any error wehile sending thenn print error message
+    if (send(channel_for_client, string_storage, strlen(string_storage), ZERO) == -1)
     {
-        perror("send_command failed");
+        perror("deliver_command_to_server failed");
     }
 }
 
-void send_file(int client_sock, const char *filename)
+// function deliver_file_to_server to send file from client to server
+empty_return_function deliver_file_to_server(number channel_for_client, constant character *document_name)
 {
-    char buffer[BUFFER_SIZE];
-    int file = open(filename, O_RDONLY);
-    if (file < 0)
+
+    character string_storage[BUFFER_SIZE];
+    // open file - document_name with read only access
+    number document_a4 = open(document_name, O_RDONLY);
+    // if error then print error message
+    if (document_a4 < ZERO)
     {
         perror("open file");
         return;
     }
     // Check the size of the file
-    off_t file_size = lseek(file, 0, SEEK_END);
-    lseek(file, 0, SEEK_SET); // Rewind to the start of the file
+    off_t file_size = lseek(document_a4, ZERO, SEEK_END);
+    // Rewind to the start of the file
+    lseek(document_a4, ZERO, SEEK_SET);
 
-    if (file_size == 0)
+    // if file has no content then state this message but still send it to smain
+    if (file_size == ZERO)
     {
-        printf("File is empty: %s\n", filename);
-        send(client_sock, "", 1, 0);
+        show_on_cmd("File is empty: %s\n", document_name);
+        // sending to smain
+        send(channel_for_client, "", 1, ZERO);
     }
+    // if there is content
     else
     {
+
         ssize_t bytes_read;
-        while ((bytes_read = read(file, buffer, sizeof(buffer))) > 0)
+        // read the file and send that read content to smain
+        while ((bytes_read = read(document_a4, string_storage, sizeof(string_storage))) > ZERO)
         {
-            if (send(client_sock, buffer, bytes_read, 0) == -1)
+            // send call to send it to smain
+            // if there is any error while sending then break it
+            if (send(channel_for_client, string_storage, bytes_read, ZERO) == -1)
             {
                 perror("send file");
                 break;
@@ -57,13 +95,15 @@ void send_file(int client_sock, const char *filename)
         }
     }
 
-    close(file);
+    close(document_a4);
 }
 
-void split_path(const char *full_path, char *folder_name, char *file_name)
+// function split_path fucntion is to get filename from the path passeed to this function
+// ignore all folders which are given in path and just save filename to target_file_name
+empty_return_function split_path(constant character *full_path, character *folder_name, character *target_file_name)
 {
     // Find the last occurrence of the '/' character
-    const char *last_slash = strrchr(full_path, '/');
+    constant character *last_slash = strrchr(full_path, '/');
 
     // If a slash was found, separate the folder and file names
     if (last_slash != NULL)
@@ -74,28 +114,34 @@ void split_path(const char *full_path, char *folder_name, char *file_name)
         folder_name[folder_len] = '\0';
 
         // Copy the file name
-        strcpy(file_name, last_slash + 1);
+        strcpy(target_file_name, last_slash + 1);
     }
     else
     {
         // If no slash is found, treat the entire path as a file name
         strcpy(folder_name, "");
-        strcpy(file_name, full_path);
+        strcpy(target_file_name, full_path);
     }
 }
 
-// Function to generate a unique filename
-void get_unique_filename(const char *folder_path, char *unique_filename)
+// Function to generate a unique document_name
+empty_return_function get_unique_filename(constant character *folder_path, character *unique_filename)
 {
-    int i = 1;
-    char temp_filename[BUFFER_SIZE];
-    char folder_name[1024];
-    char base_filename[1024];
-    char base_name[BUFFER_SIZE];
-    char extension[BUFFER_SIZE];
+    // to keep a count that how many files already exists with the same name
+    number file_name_with_same_name_count = 1;
+    character temp_filename[BUFFER_SIZE];
+    // folder_name tis to store all folders string
+    character folder_name[1024];
+    // base_filena is to store the end file name
+    character base_filename[1024];
+    // base is to store filename before extension
+    // like for file.c base_name will be file
+    character base_name[BUFFER_SIZE];
+    // extension will be .c
+    character extension[BUFFER_SIZE];
     split_path(folder_path, folder_name, base_filename);
     // Split the base_filename into base_name and extension
-    const char *dot = strrchr(base_filename, '.');
+    constant character *dot = strrchr(base_filename, '.');
     if (dot)
     {
         // Extract base name and extension
@@ -107,24 +153,25 @@ void get_unique_filename(const char *folder_path, char *unique_filename)
     {
         // No extension found
         snprintf(base_name, BUFFER_SIZE, "%s", base_filename);
-        extension[0] = '\0'; // No extension
+        extension[ZERO] = '\0'; // No extension
     }
 
-    // Combine the folder path and base filename to form the initial full path
+    // Combine the folder path and base document_name to form the initial full path
     snprintf(unique_filename, BUFFER_SIZE, "%s%s", folder_name, base_filename);
 
-    // Check if file exists in the specified folder and generate a unique filename if necessary
+    // Check if file exists in the specified folder and generate a unique document_name if necessary
     while (access(unique_filename, F_OK) != -1)
     {
-        snprintf(temp_filename, BUFFER_SIZE, "%s%s(%d)%s", folder_name, base_name, i++, extension);
+        snprintf(temp_filename, BUFFER_SIZE, "%s%s(%d)%s", folder_name, base_name, file_name_with_same_name_count++, extension);
         snprintf(unique_filename, BUFFER_SIZE, "%s", temp_filename);
     }
 }
 
-int create_directory_recursive(const char *path)
+// this is to create the folders recursively
+number create_directory_recursive(constant character *path)
 {
-    char temp[256];
-    char *p = NULL;
+    character temp[256];
+    character *p = NULL;
     size_t len;
 
     snprintf(temp, sizeof(temp), "%s", path);
@@ -140,7 +187,7 @@ int create_directory_recursive(const char *path)
         if (*p == '/')
         {
             *p = '\0';
-            if (mkdir(temp, 0755) != 0 && errno != EEXIST)
+            if (mkdir(temp, 0755) != ZERO && errno != EEXIST)
             {
                 perror("mkdir");
                 return -1;
@@ -149,172 +196,239 @@ int create_directory_recursive(const char *path)
         }
     }
 
-    return 0;
+    return ZERO;
 }
 
-void receive_file(int client_sock, const char *filename)
+// function get_file_from_server is to get file content from smain
+empty_return_function get_file_from_server(number channel_for_client, constant character *document_name)
 {
-    char buffer[BUFFER_SIZE];
-    FILE *file;
+    // to store the buffer string here in this variable
+    character string_storage[BUFFER_SIZE];
+    FILE *document_a4;
     ssize_t bytes_received;
-    char unique_filename[BUFFER_SIZE];
-    char file_path[BUFFER_SIZE];
-    char cwd[PATH_MAX];
+    character unique_filename[BUFFER_SIZE];
+    character file_path[BUFFER_SIZE];
+    // to get the present working directory to fetch file
+    character cwd[PATH_MAX];
     getcwd(cwd, sizeof(cwd));
-    char folder_name[1024];
-    char base_filename[1024];
-    split_path(filename, folder_name, base_filename);
+    character folder_name[1024];
+    character base_filename[1024];
+
+    split_path(document_name, folder_name, base_filename);
     snprintf(file_path, sizeof(file_path), "%s/%s", cwd, base_filename);
 
+    // if there is already same name filename exists in the pwd then rename it and make it unique
     get_unique_filename(file_path, unique_filename);
 
-    file = fopen(unique_filename, "wb");
-    if (file == NULL)
+    // open the file with write access
+    document_a4 = fopen(unique_filename, "wb");
+    // if it doesnt open it then through error message
+    if (document_a4 == NULL)
     {
         perror("Failed to open file for writing");
         return;
     }
 
-    printf("Receiving file: %s\n", unique_filename);
-    // Receive the file data in chunks
-    while ((bytes_received = recv(client_sock, buffer, sizeof(buffer), 0)) >= 0)
+    // message on terminal that file is being recieved
+    show_on_cmd("Receiving file: %s\n", unique_filename);
+    // Receive the file data in chunks from smain and wait untill client gets it
+    while ((bytes_received = recv(channel_for_client, string_storage, sizeof(string_storage), ZERO)) >= ZERO)
     {
-        fwrite(buffer, 1, bytes_received, file);
-        if (bytes_received < sizeof(buffer))
+        fwrite(string_storage, 1, bytes_received, document_a4);
+        if (bytes_received < sizeof(string_storage))
         {
             break; // End of file
         }
     }
 
-    if (bytes_received < 0)
+    // if none bytes recieved from the file then through error message
+    if (bytes_received < ZERO)
     {
         perror("Failed to receive file");
     }
-
-    fclose(file);
+    // close the file
+    fclose(document_a4);
     return;
 }
 
-void handle_command(int client_sock, const char *command, const char *arg1, const char *arg2)
+// function manage_command_execution checks which command has been given by client
+number manage_command_execution(number channel_for_client, constant character *instruction_from_user, constant character *parameter_1, constant character *parameter_2)
 {
-    if (strcmp(command, "ufile") == 0)
+    // based on command implement functions
+    // if ufile
+    if (strcmp(instruction_from_user, "ufile") == ZERO)
     {
-        send_command(client_sock, command, arg1, arg2);
-        send_file(client_sock, arg1);
+        number document_a4 = open(parameter_1, O_RDONLY);
+        // if error then print error message
+        if (document_a4 < ZERO)
+        {
+            perror("open file");
+            return -1;
+        }
+        // go to deliver_command_to_server and send this command to smain to execute and take appropriate actions
+        deliver_command_to_server(channel_for_client, instruction_from_user, parameter_1, parameter_2);
+        // function to deliver file content to smain
+        deliver_file_to_server(channel_for_client, parameter_1);
     }
-    else if (strcmp(command, "dfile") == 0)
+    // if dfile
+    else if (strcmp(instruction_from_user, "dfile") == ZERO)
     {
-        send_command(client_sock, command, arg1, arg2);
-        receive_file(client_sock, arg1);
+        // go to deliver_command_to_server and send this command to smain to execute and take appropriate actions
+        deliver_command_to_server(channel_for_client, instruction_from_user, parameter_1, parameter_2);
+        // function to receive file content from smain
+        get_file_from_server(channel_for_client, parameter_1);
     }
-    else if (strcmp(command, "rmfile") == 0)
+    // if rmfile
+    else if (strcmp(instruction_from_user, "rmfile") == ZERO)
     {
-        send_command(client_sock, command, arg1, arg2);
+        // go to deliver_command_to_server and send this command to smain to execute and take appropriate actions
+        deliver_command_to_server(channel_for_client, instruction_from_user, parameter_1, parameter_2);
     }
-    else if (strcmp(command, "dtar") == 0 || strcmp(command, "display") == 0)
+    // if dtar or display
+    else if (strcmp(instruction_from_user, "dtar") == ZERO || strcmp(instruction_from_user, "display") == ZERO)
     {
-        send_command(client_sock, command, arg1, arg2);
+        // go to deliver_command_to_server and send this command to smain to execute and take appropriate actions
+        deliver_command_to_server(channel_for_client, instruction_from_user, parameter_1, parameter_2);
     }
+    // if not valid command
     else
     {
-        printf("Unknown command: %s\n", command);
+        // print error message
+        show_on_cmd("Unknown instruction_from_user: %s\n", instruction_from_user);
+        return -1;
     }
 }
 
-int main()
+// entry point of code
+number main()
 {
-    int client_sock;
-    struct sockaddr_in server_addr;
-    char command[BUFFER_SIZE], arg1[BUFFER_SIZE], arg2[BUFFER_SIZE];
-    char *token;
-    char input[BUFFER_SIZE];
-
-    // Create socket
-    if ((client_sock = socket(AF_INET, SOCK_STREAM, 0)) < 0)
+    // this is the socket initialization for client channel
+    number channel_for_client;
+    // socket addresses for server
+    object sockaddr_in server_channel_address;
+    // instruction_from_user is command or operation asked from client to perform
+    // parameter_1 is arguement 1 of command if there is any
+    // parameter_2 is arguement 2 of command if there is any
+    character instruction_from_user[BUFFER_SIZE], parameter_1[BUFFER_SIZE], parameter_2[BUFFER_SIZE];
+    // a temporary variable to store command and its parameters one by one
+    character *temp_storage_for_command;
+    // to store the inputed string from client in cmd
+    character user_entered_command[BUFFER_SIZE];
+    // make client socket here - TCP/IP socket
+    //  AF_INET stands for "Address family internet". Here we are taking it from IPv4 addresses
+    //  SOCK_STREAM is basically for providing reliable, two-way, connection-based byte streams. We use SOCKK_STREAM in TCP connection and SOCK_DGRAM for UDP
+    //  ZERO is to choose protocol by default as per AF_INET and SOCK_STREAM
+    //  here by default protocol would be TCP
+    //  this "if" condition checks if there is any error while creating socket
+    if ((channel_for_client = socket(AF_INET, SOCK_STREAM, ZERO)) < ZERO)
     {
-        perror("Socket creation error");
+        // if there is then print this message with error statement
+        perror("Failure of client socket due to: ");
+        // then exit from code
         exit(EXIT_FAILURE);
     }
-
-    // Set up server address
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(PORT);
-    if (inet_pton(AF_INET, "127.0.0.1", &server_addr.sin_addr) <= 0)
+    // this is used to specify what IP address family would be used for server socket
+    server_channel_address.sin_family = AF_INET;
+    // this is for assigning port to server
+    // htons is used to convert - a host's byte order of 16-bit number (short) - from the to the network's byte order.
+    server_channel_address.sin_port = htons(PORT);
+    // inet_pton is used here to convert string IP address to binary form
+    if (inet_pton(AF_INET, IP_ADDRESS, &server_channel_address.sin_addr) <= ZERO)
     {
+        // if unsuccesfull to change then print error
         perror("Invalid address");
+        // exit with failure coode
         exit(EXIT_FAILURE);
     }
-
     // Connect to server
-    if (connect(client_sock, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
+    if (connect(channel_for_client, (object sockaddr *)&server_channel_address, sizeof(server_channel_address)) < ZERO)
     {
-        perror("Connection failed");
+        // if not connected then print error and exit with failure
+        perror("Failure of bind due to");
         exit(EXIT_FAILURE);
     }
-
+    // infite loop to take command from client to perform through smain
     while (1)
     {
-        // Get command from user
-        printf("Enter command: ");
-        if (fgets(input, sizeof(input), stdin) == NULL)
+        // Get instruction_from_user from user
+        show_on_cmd("Please give command: ");
+        // if n o user_entered_command has been detected from client then print error message
+        // and then continue from top of the loop using continue;
+        if (fgets(user_entered_command, sizeof(user_entered_command), stdin) == NULL)
         {
             perror("fgets failed");
             continue;
         }
-
         // Remove newline character
-        input[strcspn(input, "\n")] = 0;
-
-        // Tokenize the input
-        token = strtok(input, " ");
-        if (token == NULL)
+        user_entered_command[strcspn(user_entered_command, "\n")] = ZERO;
+        // Tokenize the user_entered_command means break it on basis of space and use command and parameter separately
+        temp_storage_for_command = strtok(user_entered_command, " ");
+        // if there is no command then pint error message to client
+        if (temp_storage_for_command == NULL)
         {
-            printf("No command entered.\n");
+            show_on_cmd("No command has been entered by you.\n");
+            // then continue form top
             continue;
         }
-
-        strncpy(command, token, sizeof(command));
-        token = strtok(NULL, " ");
-        if (token != NULL)
+        // keep building final command and store it into instruction_from_user
+        strncpy(instruction_from_user, temp_storage_for_command, sizeof(instruction_from_user));
+        // this will take parameter_1 or arguement 1
+        temp_storage_for_command = strtok(NULL, " ");
+        // if there is arguement 1 then
+        if (temp_storage_for_command != NULL)
         {
-            strncpy(arg1, token, sizeof(arg1));
-            token = strtok(NULL, " ");
-            if (token != NULL)
+            // add that arguement 1 to parameter_1
+            strncpy(parameter_1, temp_storage_for_command, sizeof(parameter_1));
+            // check for arguement 2
+            temp_storage_for_command = strtok(NULL, " ");
+            // if there is arguement 2
+            if (temp_storage_for_command != NULL)
             {
-                strncpy(arg2, token, sizeof(arg2));
+                // store it to parameter_2
+                strncpy(parameter_2, temp_storage_for_command, sizeof(parameter_2));
             }
+            // otherwise keep it null
             else
             {
-                arg2[0] = '\0';
+                parameter_2[ZERO] = '\0';
             }
         }
+        // otherwise keep them null
         else
         {
-            arg1[0] = '\0';
-            arg2[0] = '\0';
+            parameter_1[ZERO] = '\0';
+            parameter_2[ZERO] = '\0';
         }
-
-        // Send the command
-        handle_command(client_sock, command, arg1, arg2);
-        // Receive and display response (optional)
-        char response[BUFFER_SIZE];
-        int len = recv(client_sock, response, sizeof(response) - 1, 0);
-        if (len > 0)
+        // Send the instruction_from_user to manage_command_execution in order to check which function to be implemented based on command
+        int ret = manage_command_execution(channel_for_client, instruction_from_user, parameter_1, parameter_2);
+        if (ret == -1)
         {
-            response[len] = '\0'; // Null-terminate the received data
-            printf("Server response: %s\n", response);
+            continue;
         }
-        else if (len == 0)
+        // This is to get final reponse from server or smain and then print it as indication that command has been executed to the end
+        character reply_from_server[BUFFER_SIZE];
+        // will wait untill it gets message from smain
+        // if no message then in that case it won't move forward
+        number len = recv(channel_for_client, reply_from_server, sizeof(reply_from_server) - 1, ZERO);
+        // print that message on terminal
+        if (len > ZERO)
         {
-            printf("Server disconnected.\n");
+            reply_from_server[len] = '\0'; // Null-terminate the received data
+            show_on_cmd("Server reply_from_server: %s\n", reply_from_server);
+        }
+        // state if server has been disconnected
+        else if (len == ZERO)
+        {
+            show_on_cmd("Server disconnected.\n");
             break;
         }
+        // if there was any issue with recv then state it through this message
         else
         {
-            perror("recv failed");
+            perror("recv");
         }
     }
-
-    close(client_sock);
-    return 0;
+    // completing all operations and then close the channel or socket
+    close(channel_for_client);
+    return ZERO;
 }
