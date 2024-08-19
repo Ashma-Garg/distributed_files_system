@@ -12,7 +12,7 @@
 #include <errno.h>
 #include <libgen.h>
 // defining all necessary self defined macros which will be used through out the code
-#define PORT 8051
+#define PORT 8053
 #define string_storage_SIZE 1024
 // text and pdf servers will be accessed through smain only
 // these servers are hidden from client and client has no knowledge of it
@@ -157,6 +157,9 @@ empty_return_function split_path(constant character *full_path, character *folde
     // Find the last occurrence of the '/' character
     constant character *last_slash = strrchr(full_path, '/');
     // If a slash was found, separate the folder and file names
+
+    //     /folder/folder_1/folder_2/folder_3/filename.c
+    //     folder
     if (last_slash != NULL)
     {
         // Copy the folder name (including the slash)
@@ -270,6 +273,7 @@ empty_return_function manage_client_interaction(number channel_for_client)
 // this function is a common fucntion to create a recursive directory if it's not there in the system
 number create_directory_recursive(constant character *directory_to_be_created_path)
 {
+    // folder/folder_1/folder_2................
     // iinitializing string for temporary name of file
     character file_name_temporary[256];
     // a null pointer initialization
@@ -328,6 +332,8 @@ empty_return_function manage_upload_file_to_server(number channel_for_client, ch
     if (strstr(document_name, ".c") != NULL)
     {
         // construct the folder path- directory_to_be_created_path -  on the server
+        // ufile           pwd_folder/z.c      t_folder/t_folder_1
+        // target_location - t_folder/t_folder_1
         snprintf(destination_path, sizeof(destination_path), "%s/smain/%s", return_home_value(), target_location);
         // Create the destination directory if it doesn't exist
         // if error then return
@@ -340,6 +346,7 @@ empty_return_function manage_upload_file_to_server(number channel_for_client, ch
         // we are using return_home_value() function here to get HOME variable value to keep it dynamic
         // scan multiple strings to build document_location
         snprintf(document_location, sizeof(document_location), "%s/smain/%s/%s", return_home_value(), target_location, base_filename);
+        // document_location- home/smain/t_folder/t_folder_1/z.c
         document_a4 = fopen(document_location, "wb");
         // if no document found then
         if (document_a4 == NULL)
@@ -697,6 +704,8 @@ empty_return_function manage_display_list_document_names_in_folder(number channe
     snprintf(local_path, sizeof(local_path), "%s/smain/%s", return_home_value(), pathname);
     object stat st;
     // check if directory exists
+
+    // file_size, file_name, file_type
     if (stat(local_path, &st) == ZERO && S_ISDIR(st.st_mode))
     {
         // Directory exists, proceed to find .c files
@@ -782,13 +791,13 @@ empty_return_function manage_display_list_document_names_in_folder(number channe
     // Step 3: Communicate with Stext server to get the list of .txt files
     // connect to the text server
     link_to_server(TEXT_ADDRESS, STEXT_PORT, &stext_sock);
+    memset(string_storage, ZERO, string_storage_SIZE); 
     // build the arguement string
     snprintf(string_storage, sizeof(string_storage), "display %s", pathname);
     // send the command to the text server
     send(stext_sock, string_storage, strlen(string_storage), ZERO);
-    send(spdf_sock, string_storage, strlen(string_storage), ZERO);
     // print on the server if send was successfully
-    show_on_cmd("manage_display_list_document_names_in_folder: Sent display command to Stext server\n");
+    show_on_cmd("Display command: Sent display command to Stext server\n");
     // var to keep count if we receive anything from stext server
     // this is for the case if directory does not exist in the stext server
     number received_anything_stext = ZERO;
@@ -800,7 +809,7 @@ empty_return_function manage_display_list_document_names_in_folder(number channe
         // checks if directory empty
         if (strcmp(string_storage, "DIRECTORY_NOT_FOUND\n") == ZERO)
         {
-            show_on_cmd("manage_display_list_document_names_in_folder: Directory not found on Stext for %s\n", pathname);
+            show_on_cmd("Display command: Directory not found on Stext for %s\n", pathname);
             break; // break from the loop
         }
         // var to keep count if we receive anything from stext server

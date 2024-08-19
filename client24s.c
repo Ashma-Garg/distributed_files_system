@@ -15,7 +15,7 @@
 #endif
 // defining all necessary self defined macros which will be used through out the code
 // this is the port where client will be running
-#define PORT 8051
+#define PORT 8053
 // this is the macros for buffer_size
 #define BUFFER_SIZE 1024
 #define IP_ADDRESS "127.0.0.1"
@@ -127,6 +127,7 @@ empty_return_function split_path(constant character *full_path, character *folde
 // Function to generate a unique document_name
 empty_return_function get_unique_filename(constant character *folder_path, character *unique_filename)
 {
+    // home/project/filename.c - exists
     // to keep a count that how many files already exists with the same name
     number file_name_with_same_name_count = 1;
     character temp_filename[BUFFER_SIZE];
@@ -140,7 +141,13 @@ empty_return_function get_unique_filename(constant character *folder_path, chara
     // extension will be .c
     character extension[BUFFER_SIZE];
     split_path(folder_path, folder_name, base_filename);
+    // filename(1).c
+    // filename(2).c
     // Split the base_filename into base_name and extension
+    // base_filename -      filename.c
+    // filename        .c
+    // dot = .c
+    // base_name = filename
     constant character *dot = strrchr(base_filename, '.');
     if (dot)
     {
